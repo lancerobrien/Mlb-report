@@ -54,6 +54,20 @@ PAGE_TOP = """
             font-size:14px; margin-bottom:4px; }
     .out { animation: fade .3s ease-in; }
     @keyframes fade { from {opacity:0} to {opacity:1} }
+    .section-title { font-size:13px; text-transform:uppercase; letter-spacing:.06em;
+           color:#7a8aa8; margin:22px 0 10px; font-weight:600; }
+    .card { background:#1c1c1c; border-radius:12px; padding:14px;
+           margin-bottom:10px; border-left:3px solid #2563eb; }
+    .pick-name { color:#4dd0e1; font-weight:700; font-size:16px;
+           display:block; margin-bottom:6px; }
+    .reason { color:#c7ccd6; font-size:14px; line-height:1.4; }
+    .conf { display:inline-block; margin-top:8px; padding:3px 10px;
+           border-radius:20px; font-size:11px; font-weight:700;
+           text-transform:uppercase; letter-spacing:.03em; }
+    .conf-high { background:#164e2b; color:#4ade80; }
+    .conf-medium { background:#4a3b12; color:#fbbf24; }
+    .conf-low { background:#3a1c1c; color:#f87171; }
+    .empty-note { color:#666; font-size:14px; font-style:italic; }
   </style>
 </head>
 <body><div class="wrap">
@@ -114,10 +128,27 @@ Only build these bet types: {wanted_bets}.
 Skip any game where the data is missing, corrupted (e.g. an already-finished
 game with a duplicated stat line), or too thin to support a real pick.
 
-Output format: a short, clean, mobile-readable list. For each pick, give the
-pick itself, a one-line reason referencing the actual signals above, and a
-rough confidence (low/medium/high). Keep the whole thing tight — no filler,
-no disclaimers, no repeating the raw data back.
+Only put a pick under a section if it actually matches that bet type — a
+team total or moneyline pick belongs under "Parlays", never under
+"Hit Picks", even if a hit-related signal contributed to the reasoning.
+
+Respond with ONLY valid JSON, no markdown fences, no commentary before or
+after. Use exactly this shape:
+{{
+  "sections": [
+    {{
+      "title": "Hit Picks",
+      "picks": [
+        {{"pick": "Short pick description, e.g. player/team + bet",
+          "reason": "One tight sentence citing the actual signals used",
+          "confidence": "high"}}
+      ]
+    }}
+  ]
+}}
+Only include sections for bet types you were asked to build, and omit a
+section entirely if it has zero real picks rather than inventing one.
+confidence must be exactly one of: "high", "medium", "low".
 
 RAW DATA:
 {report_text}
@@ -126,9 +157,10 @@ RAW DATA:
 
 
 def call_claude(prompt):
+    """Returns (picks_json_or_None, error_message_or_None)."""
     if not ANTHROPIC_API_KEY:
-        return ("No ANTHROPIC_API_KEY is set on the server. Add it in Render "
-                "under Environment, then redeploy.")
+        return None, ("No ANTHROPIC_API_KEY is set on the server. Add it in "
+                       "Render under Environment, then redeploy.")
     try:
         resp = requests.post(
             "https://api.anthropic.com/v1/messages",
@@ -146,13 +178,55 @@ def call_claude(prompt):
         )
         data = resp.json()
         if resp.status_code != 200:
-            return f"API error ({resp.status_code}): {json.dumps(data)[:1500]}"
+            return None, f"API error ({resp.status_code}): {json.dumps(data)[:1500]}"
         parts = [b.get("text", "") for b in data.get("content", []) if b.get("type") == "text"]
-        if parts:
-            return "\n".join(parts)
-        return f"(No text returned by the model.) Raw response: {json.dumps(data)[:1500]}"
+        if not parts:
+            return None, f"(No text returned by the model.) Raw response: {json.dumps(data)[:1500]}"
+        text = "\n".join(parts).strip()
+        # Strip stray markdown fences if the model adds them despite instructions
+        if text.startswith("```"):
+            text = text.strip("`")
+            text = text.split("\n", 1)[1] if "\n" in text else text
+            if text.rstrip().endswith("```"):
+                text = text.rstrip()[:-3]
+        try:
+            parsed = json.loads(text)
+            return parsed, None
+        except json.JSONDecodeError:
+            return None, f"Model didn't return valid JSON. Raw text: {text[:1500]}"
     except Exception as e:
-        return f"Error calling Claude API: {e}"
+        return None, f"Error calling Claude API: {e}"
+
+
+def escape_html(s):
+    return (str(s).replace("&", "&amp;").replace("<", "&lt;")
+            .replace(">", "&gt;").replace('"', "&quot;"))
+
+
+def render_picks(parsed):
+    sections = parsed.get("sections", [])
+    if not sections:
+        return '<p class="empty-note">No picks came back — try different settings or check back closer to first pitch.</p>'
+    html_parts = []
+    for section in sections:
+        title = escape_html(section.get("title", "Picks"))
+        picks = section.get("picks", [])
+        html_parts.append(f'<div class="section-title">{title}</div>')
+        if not picks:
+            html_parts.append('<p class="empty-note">No picks in this category today.</p>')
+            continue
+        for p in picks:
+            pick = escape_html(p.get("pick", ""))
+            reason = escape_html(p.get("reason", ""))
+            conf = str(p.get("confidence", "medium")).lower()
+            if conf not in ("high", "medium", "low"):
+                conf = "medium"
+            html_parts.append(
+                f'<div class="card"><span class="pick-name">{pick}</span>'
+                f'<span class="reason">{reason}</span>'
+                f'<span class="conf conf-{conf}">{conf}</span></div>'
+            )
+    return "".join(html_parts)
 
 
 def settings_form(action="/run"):
@@ -193,13 +267,20 @@ def run():
     try:
         report_text = run_report_and_capture()
     except Exception as e:
-        report_text = f"Error running data collection: {e}"
-
-    if report_text.strip() and "Error running" not in report_text:
-        prompt = build_prompt(report_text, signals, bets)
-        picks = call_claude(prompt)
+        report_text = ""
+        data_error = f"Error running data collection: {e}"
     else:
-        picks = report_text or "No data returned."
+        data_error = None if report_text.strip() else "No data returned."
+
+    if data_error:
+        body = f'<p class="empty-note">{escape_html(data_error)}</p>'
+    else:
+        prompt = build_prompt(report_text, signals, bets)
+        parsed, err = call_claude(prompt)
+        if err:
+            body = f'<pre>{escape_html(err)}</pre>'
+        else:
+            body = render_picks(parsed)
 
     query = "&".join([f"signal={s}" for s in signals] + [f"bet={b}" for b in bets])
     html = (
@@ -207,7 +288,7 @@ def run():
         + '<h1>&#9918; Today\'s Picks</h1>'
         + f'<a class="btn" href="/run?{query}">&#8635; Refresh</a>'
         + '<a class="btn secondary" href="/">&#9881; Change Settings</a>'
-        + f'<div class="out"><pre>{picks}</pre></div>'
+        + f'<div class="out">{body}</div>'
         + PAGE_BOTTOM
     )
     return Response(html, mimetype="text/html")
