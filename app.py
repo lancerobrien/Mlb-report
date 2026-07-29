@@ -144,10 +144,13 @@ def call_claude(prompt):
             },
             timeout=120,
         )
-        resp.raise_for_status()
         data = resp.json()
+        if resp.status_code != 200:
+            return f"API error ({resp.status_code}): {json.dumps(data)[:1500]}"
         parts = [b.get("text", "") for b in data.get("content", []) if b.get("type") == "text"]
-        return "\n".join(parts) if parts else "(No text returned by the model.)"
+        if parts:
+            return "\n".join(parts)
+        return f"(No text returned by the model.) Raw response: {json.dumps(data)[:1500]}"
     except Exception as e:
         return f"Error calling Claude API: {e}"
 
