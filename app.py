@@ -68,6 +68,10 @@ PAGE_TOP = """
     .conf-medium { background:#4a3b12; color:#fbbf24; }
     .conf-low { background:#3a1c1c; color:#f87171; }
     .empty-note { color:#666; font-size:14px; font-style:italic; }
+    details { margin-top:24px; border:1px solid #333; border-radius:10px;
+           padding:10px 14px; }
+    summary { color:#9ab; font-size:14px; cursor:pointer; padding:6px 0; }
+    details pre { margin-top:10px; }
   </style>
 </head>
 <body><div class="wrap">
@@ -283,12 +287,20 @@ def run():
             body = render_picks(parsed)
 
     query = "&".join([f"signal={s}" for s in signals] + [f"bet={b}" for b in bets])
+    raw_block = ""
+    if report_text.strip():
+        raw_block = (
+            '<details><summary>&#128203; View raw data pulled (all games, '
+            'lineups, form, weather, etc.)</summary>'
+            f'<pre>{escape_html(report_text)}</pre></details>'
+        )
     html = (
         PAGE_TOP
         + '<h1>&#9918; Today\'s Picks</h1>'
         + f'<a class="btn" href="/run?{query}">&#8635; Refresh</a>'
         + '<a class="btn secondary" href="/">&#9881; Change Settings</a>'
         + f'<div class="out">{body}</div>'
+        + raw_block
         + PAGE_BOTTOM
     )
     return Response(html, mimetype="text/html")
