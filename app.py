@@ -155,9 +155,12 @@ IMPORTANT for "Parlays": a parlay pick must be an ACTUAL multi-leg parlay —
 Team C -1.5 run line), not a single standalone pick. Never put a one-leg
 pick under Parlays. If you don't have enough independently-supported legs
 across different games to build a real parlay, omit the Parlays section
-entirely rather than faking one with a single leg. Don't stack opposing
-angles from the same game in one parlay (e.g. a team's run line AND that
-same game's total).
+entirely rather than faking one with a single leg. Every leg in a parlay
+must come from a DIFFERENT game — never include two legs on the same team
+or the same game (e.g. a team's moneyline AND that team's run line, or a
+team's run line AND that same game's total), even if both look correct.
+Those aren't independent bets, they're the same bet twice, and add no real
+diversification.
 
 Only build picks from games that clearly haven't started yet — if any data
 looks like it's from an in-progress or finished game (duplicated stat
