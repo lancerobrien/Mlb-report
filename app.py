@@ -68,6 +68,8 @@ PAGE_TOP = """
     .conf-medium { background:#4a3b12; color:#fbbf24; }
     .conf-low { background:#3a1c1c; color:#f87171; }
     .empty-note { color:#666; font-size:14px; font-style:italic; }
+    ul.legs { margin:2px 0 8px; padding-left:20px; }
+    ul.legs li { color:#a9b4c4; font-size:13.5px; line-height:1.5; }
     details { margin-top:24px; border:1px solid #333; border-radius:10px;
            padding:10px 14px; }
     summary { color:#9ab; font-size:14px; cursor:pointer; padding:6px 0; }
@@ -136,6 +138,20 @@ Only put a pick under a section if it actually matches that bet type — a
 team total or moneyline pick belongs under "Parlays", never under
 "Hit Picks", even if a hit-related signal contributed to the reasoning.
 
+IMPORTANT for "Parlays": a parlay pick must be an ACTUAL multi-leg parlay —
+2 to 4 legs combined into one bet (e.g. Team A ML + Team B Under 8.5 +
+Team C -1.5 run line), not a single standalone pick. Never put a one-leg
+pick under Parlays. If you don't have enough independently-supported legs
+across different games to build a real parlay, omit the Parlays section
+entirely rather than faking one with a single leg. Don't stack opposing
+angles from the same game in one parlay (e.g. a team's run line AND that
+same game's total).
+
+Only build picks from games that clearly haven't started yet — if any data
+looks like it's from an in-progress or finished game (duplicated stat
+lines, empty lineups where one should exist, etc.), skip that game
+entirely.
+
 Respond with ONLY valid JSON, no markdown fences, no commentary before or
 after. Use exactly this shape:
 {{
@@ -147,12 +163,22 @@ after. Use exactly this shape:
           "reason": "One tight sentence citing the actual signals used",
           "confidence": "high"}}
       ]
+    }},
+    {{
+      "title": "Parlays",
+      "picks": [
+        {{"pick": "2-4 leg parlay name, e.g. '3-leg parlay'",
+          "legs": ["Leg 1 description", "Leg 2 description", "Leg 3 description"],
+          "reason": "One tight sentence on why these legs combine well",
+          "confidence": "medium"}}
+      ]
     }}
   ]
 }}
 Only include sections for bet types you were asked to build, and omit a
 section entirely if it has zero real picks rather than inventing one.
-confidence must be exactly one of: "high", "medium", "low".
+confidence must be exactly one of: "high", "medium", "low". Only include
+"legs" for Parlays picks — omit it for every other bet type.
 
 RAW DATA:
 {report_text}
@@ -226,8 +252,15 @@ def render_picks(parsed):
             conf = str(p.get("confidence", "medium")).lower()
             if conf not in ("high", "medium", "low"):
                 conf = "medium"
+            legs = p.get("legs")
+            legs_html = ""
+            if legs and isinstance(legs, list):
+                legs_html = "<ul class='legs'>" + "".join(
+                    f"<li>{escape_html(leg)}</li>" for leg in legs
+                ) + "</ul>"
             html_parts.append(
                 f'<div class="card"><span class="pick-name">{pick}</span>'
+                f'{legs_html}'
                 f'<span class="reason">{reason}</span>'
                 f'<span class="conf conf-{conf}">{conf}</span></div>'
             )
