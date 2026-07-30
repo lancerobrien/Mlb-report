@@ -176,6 +176,7 @@ def call_claude(prompt):
             json={
                 "model": ANTHROPIC_MODEL,
                 "max_tokens": 8000,
+                "thinking": {"type": "disabled"},
                 "messages": [{"role": "user", "content": prompt}],
             },
             timeout=120,
