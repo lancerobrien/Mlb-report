@@ -179,6 +179,14 @@ on the same team/game as long as they're not one of those two specific
 combos — e.g. a team's ML plus a hit prop from that same game, or a team's
 ML plus that game's total, are genuinely fine.
 
+Parlay legs should lean primarily on moneyline / run line / totals as the
+core of the parlay — props (hits, strikeouts, RBI, total bases) should be
+sprinkled in only where there's a genuine standout edge, not used as the
+whole parlay. Never build a parlay made entirely of bare "player to record
+a hit" props — that's too low a bar for what it pays and isn't a real
+edge. If you use a hit-type prop as a leg, prefer a real threshold like
+"over 1.5 hits+runs+RBI" over a bare 1+ hit prop.
+
 Only build picks from games that clearly haven't started yet — if any data
 looks like it's from an in-progress or finished game (duplicated stat
 lines, empty lineups where one should exist, etc.), skip that game
