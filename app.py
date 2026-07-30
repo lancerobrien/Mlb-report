@@ -161,6 +161,10 @@ game with a duplicated stat line), or too thin to support a real pick.
 Only put a pick under a section if it actually matches that bet type — a
 team total or moneyline pick belongs under "Parlays", never under
 "Hit Picks", even if a hit-related signal contributed to the reasoning.
+"Hit Picks" means simple "player to record 1+ hit" bets only. Anything
+using a combined or multi-stat threshold (e.g. "over 1.5 hits+runs+RBI",
+strikeout props, total bases props) belongs under "Props", not "Hit
+Picks", even though it involves a hitter.
 
 IMPORTANT for "Parlays": a parlay pick must be an ACTUAL multi-leg parlay —
 2 to 4 legs combined into one bet (e.g. Team A ML + Team B Under 8.5 +
