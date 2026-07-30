@@ -152,15 +152,20 @@ team total or moneyline pick belongs under "Parlays", never under
 
 IMPORTANT for "Parlays": a parlay pick must be an ACTUAL multi-leg parlay —
 2 to 4 legs combined into one bet (e.g. Team A ML + Team B Under 8.5 +
-Team C -1.5 run line), not a single standalone pick. Never put a one-leg
-pick under Parlays. If you don't have enough independently-supported legs
-across different games to build a real parlay, omit the Parlays section
-entirely rather than faking one with a single leg. Every leg in a parlay
-must come from a DIFFERENT game — never include two legs on the same team
-or the same game (e.g. a team's moneyline AND that team's run line, or a
-team's run line AND that same game's total), even if both look correct.
-Those aren't independent bets, they're the same bet twice, and add no real
-diversification.
+a hit prop), not a single standalone pick. Never put a one-leg pick under
+Parlays. If you don't have enough independently-supported legs to build a
+real parlay, omit the Parlays section entirely rather than faking one with
+a single leg.
+
+Avoid legs that are really the same bet twice in disguise — specifically:
+never combine a team's moneyline with that same team's run line (picking
+the winner and picking them to win by 1.5+ are almost the same outcome),
+and never combine a game's run line with that same game's total (a
+lopsided-pitcher game that covers the run line often kills the over, and
+vice versa). Everything else is fine to combine, including multiple legs
+on the same team/game as long as they're not one of those two specific
+combos — e.g. a team's ML plus a hit prop from that same game, or a team's
+ML plus that game's total, are genuinely fine.
 
 Only build picks from games that clearly haven't started yet — if any data
 looks like it's from an in-progress or finished game (duplicated stat
