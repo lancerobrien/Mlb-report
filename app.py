@@ -28,51 +28,63 @@ PAGE_TOP = """
 <html>
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MLB Report</title>
+  <title>Matchup Report</title>
   <style>
-    body { font-family: -apple-system, system-ui, sans-serif; margin:0;
-           background:#111; color:#eee; }
-    .wrap { padding: 16px; max-width: 640px; margin: 0 auto; }
-    button, .btn { display:block; width:100%; padding:16px; font-size:18px;
-           background:#2563eb; color:white; border:none; border-radius:12px;
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, system-ui, sans-serif; margin:0; color:#eee;
+      min-height:100vh;
+      background-color:#0d1526;
+      background-image:
+        radial-gradient(ellipse 60% 40% at 20% 0%, rgba(255,176,32,.16), transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 0%, rgba(255,176,32,.12), transparent 60%),
+        repeating-linear-gradient(0deg, rgba(255,255,255,.025) 0px, rgba(255,255,255,.025) 1px,
+          transparent 1px, transparent 34px),
+        linear-gradient(180deg, #0d1526 0%, #0a1020 55%, #070b16 100%);
+      background-attachment: fixed;
+    }
+    .wrap { padding: 18px 16px 40px; max-width: 640px; margin: 0 auto; }
+    button, .btn { display:block; width:100%; padding:16px; font-size:17px; font-weight:700;
+           background:#ffb020; color:#0d1526; border:none; border-radius:12px;
            text-align:center; text-decoration:none; margin-bottom:12px;
-           cursor:pointer; }
-    .btn.secondary { background:#333; }
+           cursor:pointer; letter-spacing:.01em; }
+    .btn.secondary { background:rgba(255,255,255,.08); color:#dfe6f5;
+           border:1px solid rgba(255,255,255,.12); }
     pre { white-space: pre-wrap; word-wrap: break-word; font-size:13px;
-          line-height:1.35; background:#1c1c1c; padding:12px; border-radius:8px; }
-    h1 { font-size:20px; }
-    h2 { font-size:16px; color:#9ab; margin-top:24px; }
-    fieldset { border:1px solid #333; border-radius:10px; padding:12px;
-               margin-bottom:16px; }
-    legend { padding:0 6px; color:#9ab; font-size:14px; }
-    label { display:flex; align-items:center; gap:10px; padding:8px 0;
-            font-size:15px; }
-    input[type=checkbox] { width:20px; height:20px; }
-    select, input[type=range] { width:100%; }
-    .weight-row { margin-bottom:14px; }
-    .weight-row .label-line { display:flex; justify-content:space-between;
-            font-size:14px; margin-bottom:4px; }
+          line-height:1.35; background:#0f1626; padding:12px; border-radius:8px;
+          border:1px solid rgba(255,255,255,.06); }
+    h1 { font-size:24px; font-weight:800; font-style:italic; letter-spacing:-.01em;
+         color:#fff; margin:4px 0 18px; }
+    fieldset { border:1px solid rgba(255,255,255,.12); border-radius:12px; padding:12px 14px;
+               margin-bottom:16px; background:rgba(255,255,255,.03); }
+    legend { padding:0 6px; color:#ffb020; font-size:12px; font-weight:700;
+             text-transform:uppercase; letter-spacing:.06em; }
+    label { display:flex; align-items:center; gap:10px; padding:9px 0;
+            font-size:15px; color:#dfe6f5; }
+    input[type=checkbox] { width:20px; height:20px; accent-color:#ffb020; }
     .out { animation: fade .3s ease-in; }
     @keyframes fade { from {opacity:0} to {opacity:1} }
-    .section-title { font-size:13px; text-transform:uppercase; letter-spacing:.06em;
-           color:#7a8aa8; margin:22px 0 10px; font-weight:600; }
-    .card { background:#1c1c1c; border-radius:12px; padding:14px;
-           margin-bottom:10px; border-left:3px solid #2563eb; }
-    .pick-name { color:#4dd0e1; font-weight:700; font-size:16px;
+    .section-title { background:#ffb020; color:#0d1526; font-size:11px; font-weight:800;
+           letter-spacing:.08em; text-transform:uppercase; display:inline-block;
+           padding:4px 10px; border-radius:4px; margin:20px 0 10px; }
+    .card { background:linear-gradient(135deg,#16213d,#131b30); border-radius:14px;
+           padding:14px 16px; margin-bottom:10px; box-shadow:0 2px 10px rgba(0,0,0,.35);
+           border:1px solid rgba(255,255,255,.05); }
+    .pick-name { color:#fff; font-weight:800; font-size:16px;
            display:block; margin-bottom:6px; }
-    .reason { color:#c7ccd6; font-size:14px; line-height:1.4; }
-    .conf { display:inline-block; margin-top:8px; padding:3px 10px;
-           border-radius:20px; font-size:11px; font-weight:700;
-           text-transform:uppercase; letter-spacing:.03em; }
-    .conf-high { background:#164e2b; color:#4ade80; }
-    .conf-medium { background:#4a3b12; color:#fbbf24; }
-    .conf-low { background:#3a1c1c; color:#f87171; }
-    .empty-note { color:#666; font-size:14px; font-style:italic; }
-    ul.legs { margin:2px 0 8px; padding-left:20px; }
-    ul.legs li { color:#a9b4c4; font-size:13.5px; line-height:1.5; }
-    details { margin-top:24px; border:1px solid #333; border-radius:10px;
-           padding:10px 14px; }
-    summary { color:#9ab; font-size:14px; cursor:pointer; padding:6px 0; }
+    .reason { color:#9fb0d0; font-size:13.5px; line-height:1.45; display:block; margin-top:6px; }
+    .conf { display:inline-block; margin-top:10px; padding:3px 10px;
+           border-radius:20px; font-size:10.5px; font-weight:800;
+           text-transform:uppercase; letter-spacing:.04em; }
+    .conf-high { background:#0f3d2b; color:#4ade80; }
+    .conf-medium { background:#3d3208; color:#ffb020; }
+    .conf-low { background:#3d1616; color:#f87171; }
+    .empty-note { color:#7a88a8; font-size:14px; font-style:italic; }
+    ul.legs { margin:8px 0 0; padding-left:16px; }
+    ul.legs li { color:#9fb0d0; font-size:12.5px; line-height:1.6; }
+    details { margin-top:24px; border:1px solid rgba(255,255,255,.12); border-radius:12px;
+           padding:10px 14px; background:rgba(255,255,255,.03); }
+    summary { color:#ffb020; font-size:14px; cursor:pointer; padding:6px 0; font-weight:600; }
     details pre { margin-top:10px; }
   </style>
 </head>
@@ -277,7 +289,7 @@ def settings_form(action="/run"):
         for key, label in BET_TYPES
     )
     return f"""
-    <h1>&#9918; MLB Report</h1>
+    <h1>Matchup Report</h1>
     <form method="get" action="{action}">
       <fieldset>
         <legend>Signals to weigh (checked = in priority order, top to bottom)</legend>
@@ -287,7 +299,7 @@ def settings_form(action="/run"):
         <legend>Bet types to build</legend>
         {bet_checks}
       </fieldset>
-      <button type="submit">&#9654; Build Today's Picks</button>
+      <button type="submit">Build Today's Picks</button>
     </form>
     """
 
@@ -324,15 +336,15 @@ def run():
     raw_block = ""
     if report_text.strip():
         raw_block = (
-            '<details><summary>&#128203; View raw data pulled (all games, '
+            '<details><summary>View raw data pulled (all games, '
             'lineups, form, weather, etc.)</summary>'
             f'<pre>{escape_html(report_text)}</pre></details>'
         )
     html = (
         PAGE_TOP
-        + '<h1>&#9918; Today\'s Picks</h1>'
-        + f'<a class="btn" href="/run?{query}">&#8635; Refresh</a>'
-        + '<a class="btn secondary" href="/">&#9881; Change Settings</a>'
+        + '<h1>Today\'s Picks</h1>'
+        + f'<a class="btn" href="/run?{query}">Refresh</a>'
+        + '<a class="btn secondary" href="/">Change Settings</a>'
         + f'<div class="out">{body}</div>'
         + raw_block
         + PAGE_BOTTOM
