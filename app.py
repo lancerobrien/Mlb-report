@@ -12,6 +12,7 @@ Requires an environment variable ANTHROPIC_API_KEY set in Render
 """
 import io
 import os
+import sys
 import json
 import contextlib
 import importlib
@@ -110,11 +111,15 @@ BET_TYPES = [
 
 
 def run_report_and_capture():
-    """Runs the existing data-gathering script and captures its printed output."""
+    """Runs the existing data-gathering script and captures its printed output.
+    Imports it once, then reloads on subsequent calls — importing AND
+    reloading in the same call would run main() twice and duplicate output."""
     buf = io.StringIO()
     with contextlib.redirect_stdout(buf):
-        import mlb_bvp_report as rpt
-        importlib.reload(rpt)  # re-run main() fresh each request
+        if "mlb_bvp_report" in sys.modules:
+            importlib.reload(sys.modules["mlb_bvp_report"])
+        else:
+            import mlb_bvp_report  # noqa: F401 (import itself runs main())
     return buf.getvalue()
 
 
@@ -142,6 +147,13 @@ reason for a pick, unless the user has explicitly ranked it above other
 signals. Small BvP samples (under 20 AB) should not be trusted.
 
 Only build these bet types: {wanted_bets}.
+
+CRITICAL: only state a specific point total, spread, or moneyline price if
+it appears verbatim in the "Odds" line for that game in the raw data below.
+Never invent, estimate, or round a number that isn't explicitly given. If a
+game has no "Odds" line (or it says unavailable/no line data), you may
+still make hit/HR/prop picks for it using the stats, but do not build a
+Parlays leg for that game and do not state any number for it.
 
 Skip any game where the data is missing, corrupted (e.g. an already-finished
 game with a duplicated stat line), or too thin to support a real pick.

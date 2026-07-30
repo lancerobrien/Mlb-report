@@ -26,6 +26,7 @@
 import requests
 from datetime import datetime, timezone, timedelta
 import time
+import os
 
 # ------------------------- CONFIG -------------------------
 DATE = None            # e.g. "2026-07-19"; None = today (US/Eastern)
@@ -43,6 +44,8 @@ FORM_LOOKBACK_GAMES_SHORT = 5   # how many recent games for the last-5 offense l
 FILTER_TO_UPCOMING_WINDOW = True  # only include games starting soon (see below)
 MIN_MINUTES_BEFORE_FIRST_PITCH = 5    # skip games basically already starting
 MAX_HOURS_BEFORE_FIRST_PITCH = 3      # skip games too far out (lineups not posted yet)
+INCLUDE_ODDS = True             # pull real betting lines (moneyline/run line/total)
+ODDS_API_KEY = os.environ.get("ODDS_API_KEY", "")  # set as an env var, never hardcode
 # ----------------------------------------------------------
 
 # ---- Weather source: Open-Meteo (free, no API key, no signup) ----
@@ -133,6 +136,84 @@ def filter_upcoming_games(games):
         if min_start <= game_dt <= max_start:
             kept.append(g)
     return kept
+
+
+ODDS_BASE = "https://api.the-odds-api.com/v4/sports/baseball_mlb/odds"
+
+
+def get_odds_for_date():
+    """Fetch real MLB betting lines (moneyline, run line, total) from The
+    Odds API. Returns a dict keyed by (away_team_name, home_team_name) ->
+    odds info, or {} if unavailable/unconfigured. Called ONCE per report run
+    (not per game) to conserve API quota."""
+    if not ODDS_API_KEY:
+        return {}
+    try:
+        r = session.get(
+            ODDS_BASE,
+            params={
+                "apiKey": ODDS_API_KEY,
+                "regions": "us",
+                "markets": "h2h,spreads,totals",
+                "oddsFormat": "american",
+                "dateFormat": "iso",
+            },
+            timeout=30,
+        )
+        if r.status_code != 200:
+            return {"__error__": f"Odds API returned HTTP {r.status_code}: {r.text[:200]}"}
+        odds_map = {}
+        for game in r.json():
+            home = game.get("home_team", "")
+            away = game.get("away_team", "")
+            bookmakers = game.get("bookmakers", [])
+            if not bookmakers:
+                continue
+            book = bookmakers[0]  # first available book; good enough for a single reference line
+            markets = {m["key"]: m for m in book.get("markets", [])}
+            entry = {"book": book.get("title", "")}
+            if "h2h" in markets:
+                entry["moneyline"] = {o["name"]: o["price"] for o in markets["h2h"].get("outcomes", [])}
+            if "spreads" in markets:
+                entry["run_line"] = {o["name"]: {"point": o.get("point"), "price": o.get("price")}
+                                      for o in markets["spreads"].get("outcomes", [])}
+            if "totals" in markets:
+                entry["total"] = {o["name"]: {"point": o.get("point"), "price": o.get("price")}
+                                   for o in markets["totals"].get("outcomes", [])}
+            odds_map[(away, home)] = entry
+        return odds_map
+    except Exception as e:
+        return {"__error__": f"exception fetching odds: {type(e).__name__}: {e}"}
+
+
+def fmt_odds(entry):
+    if not entry:
+        return "  Odds: no line data available for this game"
+    if "__error__" in entry:
+        return f"  Odds: unavailable ({entry['__error__']})"
+    parts = [f"  Odds ({entry.get('book', 'book')}):"]
+    if "moneyline" in entry:
+        ml = ", ".join(f"{team} {price:+d}" for team, price in entry["moneyline"].items())
+        parts.append(f"    ML: {ml}")
+    if "run_line" in entry:
+        rl_bits = []
+        for team, o in entry["run_line"].items():
+            pt = o.get("point")
+            price = o.get("price")
+            if pt is not None and price is not None:
+                rl_bits.append(f"{team} {pt:+g} ({price:+d})")
+        if rl_bits:
+            parts.append(f"    Run line: {', '.join(rl_bits)}")
+    if "total" in entry:
+        t_bits = []
+        for side, o in entry["total"].items():
+            pt = o.get("point")
+            price = o.get("price")
+            if pt is not None and price is not None:
+                t_bits.append(f"{side} {pt} ({price:+d})")
+        if t_bits:
+            parts.append(f"    Total: {', '.join(t_bits)}")
+    return "\n".join(parts)
 
 
 def get_schedule(date):
@@ -617,6 +698,11 @@ def main():
             continue
     print()
 
+    odds_map = get_odds_for_date() if INCLUDE_ODDS else {}
+    if INCLUDE_ODDS and not ODDS_API_KEY:
+        print("(No ODDS_API_KEY set — real betting lines unavailable, "
+              "picks will be based on stats only, no point totals/spreads.)\n")
+
     # Detailed BvP
     for g in games:
         try:
@@ -630,6 +716,9 @@ def main():
 
             if INCLUDE_WEATHER:
                 print(fmt_weather(get_game_weather(h_abbr, g.get("gameDate", ""))))
+
+            if INCLUDE_ODDS and ODDS_API_KEY:
+                print(fmt_odds(odds_map.get((an, hn))))
 
             if INCLUDE_TEAM_FORM or INCLUDE_BULLPEN_FATIGUE or INCLUDE_SCHEDULE_CONTEXT:
                 # today's venue = the HOME team's city, for both sides' TZ check
