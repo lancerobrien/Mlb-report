@@ -27,6 +27,7 @@ import requests
 from datetime import datetime, timezone, timedelta
 import time
 import os
+import json
 
 # ------------------------- CONFIG -------------------------
 DATE = None            # e.g. "2026-07-19"; None = today (US/Eastern)
@@ -50,6 +51,39 @@ ODDS_API_KEY = os.environ.get("ODDS_API_KEY", "")  # set as an env var, never ha
 
 # ---- Weather source: Open-Meteo (free, no API key, no signup) ----
 WEATHER_BASE = "https://api.open-meteo.com/v1/forecast"
+WEATHER_CACHE_DIR = "/tmp/mlb_weather_cache"
+WEATHER_CACHE_TTL_MINUTES = 90  # forecasts don't change fast; reuse within this window
+
+
+def _weather_cache_path(team_abbr, game_dt):
+    key = f"{team_abbr}_{game_dt.strftime('%Y-%m-%d_%H')}"
+    return os.path.join(WEATHER_CACHE_DIR, f"{key}.json")
+
+
+def _weather_cache_get(team_abbr, game_dt):
+    """Returns cached weather dict if fresh, else None. File-based because
+    the app reloads this module on every request, which would wipe any
+    plain in-memory cache."""
+    try:
+        path = _weather_cache_path(team_abbr, game_dt)
+        if not os.path.exists(path):
+            return None
+        age_minutes = (time.time() - os.path.getmtime(path)) / 60
+        if age_minutes > WEATHER_CACHE_TTL_MINUTES:
+            return None
+        with open(path) as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def _weather_cache_set(team_abbr, game_dt, result):
+    try:
+        os.makedirs(WEATHER_CACHE_DIR, exist_ok=True)
+        with open(_weather_cache_path(team_abbr, game_dt), "w") as f:
+            json.dump(result, f)
+    except Exception:
+        pass  # caching is a nice-to-have, never let it break the report
 
 # Stadium coordinates + roof type. Coordinates are stable public geographic
 # facts (low risk). roof: "open" | "dome" (always closed) | "retractable"
@@ -481,6 +515,11 @@ def get_game_weather(team_abbr, game_date_iso):
 
     try:
         game_dt = datetime.fromisoformat(game_date_iso.replace("Z", "+00:00"))
+
+        cached = _weather_cache_get(team_abbr, game_dt)
+        if cached is not None:
+            return cached
+
         r = session.get(
             WEATHER_BASE,
             params={
@@ -517,6 +556,7 @@ def get_game_weather(team_abbr, game_date_iso):
         }
         if team_abbr in CF_BEARING:
             result["park_relative"] = classify_wind_vs_park(wind_dir, CF_BEARING[team_abbr])
+        _weather_cache_set(team_abbr, game_dt, result)
         return result
     except Exception as e:
         return {"error": f"exception during weather fetch: {type(e).__name__}: {e}"}
