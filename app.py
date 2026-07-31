@@ -205,6 +205,13 @@ prop as a leg, prefer a real threshold like "over 1.5 hits+runs+RBI" over
 a bare 1+ hit prop.
 
 --- OUTPUT FORMAT ---
+For every pick, internally rate it 1-10 for how strongly the signals
+support it (10 = multiple independent signals strongly aligned, 1 = barely
+any support). Include that as a numeric "score" field. Do not filter or
+sort based on this yourself — just score honestly and include everything
+you'd otherwise have built; the app will handle filtering and ordering
+using your scores.
+
 Respond with ONLY valid JSON, no markdown fences, no commentary before or
 after. Use exactly this shape:
 {{
@@ -214,7 +221,7 @@ after. Use exactly this shape:
       "picks": [
         {{"pick": "Short pick description, e.g. player/team + bet",
           "reason": "One tight sentence citing the actual signals used",
-          "confidence": "high"}}
+          "score": 8}}
       ]
     }},
     {{
@@ -223,15 +230,15 @@ after. Use exactly this shape:
         {{"pick": "2-4 leg parlay name, e.g. '3-leg parlay'",
           "legs": ["Leg 1 description", "Leg 2 description", "Leg 3 description"],
           "reason": "One tight sentence on why these legs combine well",
-          "confidence": "medium"}}
+          "score": 7}}
       ]
     }}
   ]
 }}
 Only include sections for bet types you were asked to build, and omit a
 section entirely if it has zero real picks rather than inventing one.
-confidence must be exactly one of: "high", "medium", "low". Only include
-"legs" for Parlays picks — omit it for every other bet type.
+score must be an integer 1-10. Only include "legs" for Parlays picks —
+omit it for every other bet type.
 
 RAW DATA:
 {report_text}
@@ -287,24 +294,50 @@ def escape_html(s):
             .replace(">", "&gt;").replace('"', "&quot;"))
 
 
+MIN_SCORE_TO_SHOW = 8   # drop anything scoring below this — no "low confidence" picks at all
+SECTION_LIMITS = {"Hit Picks": 2}  # cap certain sections to their N highest-scored picks
+
+
+def score_to_label(score):
+    return "high" if score >= 8 else "medium"  # anything shown at all is already 8+ (see MIN_SCORE_TO_SHOW)
+
+
 def render_picks(parsed):
     sections = parsed.get("sections", [])
     if not sections:
         return '<p class="empty-note">No picks came back — try different settings or check back closer to first pitch.</p>'
     html_parts = []
+    any_shown = False
     for section in sections:
-        title = escape_html(section.get("title", "Picks"))
-        picks = section.get("picks", [])
+        title_raw = section.get("title", "Picks")
+        title = escape_html(title_raw)
+        raw_picks = section.get("picks", [])
+
+        # Score, filter, sort, and cap — enforced here rather than trusting
+        # the model to self-police "don't show weak picks."
+        scored = []
+        for p in raw_picks:
+            try:
+                score = int(p.get("score", 0))
+            except (TypeError, ValueError):
+                score = 0
+            if score < MIN_SCORE_TO_SHOW:
+                continue
+            scored.append((score, p))
+        scored.sort(key=lambda t: t[0], reverse=True)
+        limit = SECTION_LIMITS.get(title_raw)
+        if limit:
+            scored = scored[:limit]
+
+        if not scored:
+            continue  # nothing cleared the bar — skip the section entirely rather than showing an empty one
+
+        any_shown = True
         html_parts.append(f'<div class="section-title">{title}</div>')
-        if not picks:
-            html_parts.append('<p class="empty-note">No picks in this category today.</p>')
-            continue
-        for p in picks:
+        for score, p in scored:
             pick = escape_html(p.get("pick", ""))
             reason = escape_html(p.get("reason", ""))
-            conf = str(p.get("confidence", "medium")).lower()
-            if conf not in ("high", "medium", "low"):
-                conf = "medium"
+            conf = score_to_label(score)
             legs = p.get("legs")
             legs_html = ""
             if legs and isinstance(legs, list):
@@ -317,6 +350,9 @@ def render_picks(parsed):
                 f'<span class="reason">{reason}</span>'
                 f'<span class="conf conf-{conf}">{conf}</span></div>'
             )
+    if not any_shown:
+        return ('<p class="empty-note">No picks cleared the confidence bar today — '
+                'try again closer to first pitch, or check different games.</p>')
     return "".join(html_parts)
 
 
