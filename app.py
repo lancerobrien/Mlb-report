@@ -138,64 +138,73 @@ def build_prompt(report_text, signal_weights, bet_types):
 
     instructions = f"""You are building today's MLB betting card from the data below.
 
-Apply this priority order for weighing signals (most important first):
+SIGNAL PRIORITY (most important first):
 {priority_lines}
 
 The best plays have multiple independent signals aligning. Batter-vs-pitcher
-history should only be treated as a confirming signal, never the primary
-reason for a pick, unless the user has explicitly ranked it above other
-signals. Small BvP samples (under 20 AB) should not be trusted.
+history is a confirming signal only, never the primary reason for a pick,
+unless the user explicitly ranked it above other signals. Small BvP samples
+(under 20 AB) should not be trusted.
 
 Only build these bet types: {wanted_bets}.
-
-CRITICAL: only state a specific point total, spread, or moneyline price if
-it appears verbatim in the "Odds" line for that game in the raw data below.
-Never invent, estimate, or round a number that isn't explicitly given. If a
-game has no "Odds" line (or it says unavailable/no line data), you may
-still make hit/HR/prop picks for it using the stats, but do not build a
-Parlays leg for that game and do not state any number for it.
-
-Skip any game where the data is missing, corrupted (e.g. an already-finished
-game with a duplicated stat line), or too thin to support a real pick.
-
-Only put a pick under a section if it actually matches that bet type — a
-team total or moneyline pick belongs under "Parlays", never under
-"Hit Picks", even if a hit-related signal contributed to the reasoning.
-"Hit Picks" means simple "player to record 1+ hit" bets only. Anything
-using a combined or multi-stat threshold (e.g. "over 1.5 hits+runs+RBI",
-strikeout props, total bases props) belongs under "Props", not "Hit
-Picks", even though it involves a hitter.
-
-IMPORTANT for "Parlays": a parlay pick must be an ACTUAL multi-leg parlay —
-2 to 4 legs combined into one bet (e.g. Team A ML + Team B Under 8.5 +
-a hit prop), not a single standalone pick. Never put a one-leg pick under
-Parlays. If you don't have enough independently-supported legs to build a
-real parlay, omit the Parlays section entirely rather than faking one with
-a single leg.
-
-Avoid legs that are really the same bet twice in disguise — specifically:
-never combine a team's moneyline with that same team's run line (picking
-the winner and picking them to win by 1.5+ are almost the same outcome),
-and never combine a game's run line with that same game's total (a
-lopsided-pitcher game that covers the run line often kills the over, and
-vice versa). Everything else is fine to combine, including multiple legs
-on the same team/game as long as they're not one of those two specific
-combos — e.g. a team's ML plus a hit prop from that same game, or a team's
-ML plus that game's total, are genuinely fine.
-
-Parlay legs should lean primarily on moneyline / run line / totals as the
-core of the parlay — props (hits, strikeouts, RBI, total bases) should be
-sprinkled in only where there's a genuine standout edge, not used as the
-whole parlay. Never build a parlay made entirely of bare "player to record
-a hit" props — that's too low a bar for what it pays and isn't a real
-edge. If you use a hit-type prop as a leg, prefer a real threshold like
-"over 1.5 hits+runs+RBI" over a bare 1+ hit prop.
 
 Only build picks from games that clearly haven't started yet — if any data
 looks like it's from an in-progress or finished game (duplicated stat
 lines, empty lineups where one should exist, etc.), skip that game
 entirely.
 
+--- REAL NUMBERS ONLY ---
+Only state a specific point total, spread, or moneyline price if it
+appears verbatim in the "Odds" line for that game in the raw data below.
+Never invent, estimate, or round a number that isn't explicitly given. If
+a game has no "Odds" line (or it says unavailable/no line data), you may
+still make hit/HR/prop picks for it using the stats, but do not build a
+Parlays leg for that game and do not state any number for it.
+
+--- BET TYPE CATEGORIES ---
+Only put a pick under a section if it actually matches that bet type — a
+team total or moneyline pick belongs under "Parlays", never under "Hit
+Picks", even if a hit-related signal contributed to the reasoning.
+"Hit Picks" means simple "player to record 1+ hit" bets only. Anything
+using a combined or multi-stat threshold (e.g. "over 1.5 hits+runs+RBI"),
+strikeout props, or total bases props belongs under "Props" instead, even
+though it involves a hitter.
+
+Props must be REAL, standard sportsbook prop formats only — one of: a
+single player's hits (1+ hit, or over X.5 hits), a single player's home
+run (anytime HR), a single player's total bases (over X.5), a single
+player's combined hits+runs+RBI (over X.5), a pitcher's strikeouts
+(over/under X.5), or a single player's RBI (over X.5). Never invent a
+combined prop across MULTIPLE players (e.g. "Player A + Player B combined
+hits") — that is not a real market any sportsbook offers.
+
+--- PARLAYS ---
+A parlay pick must be an ACTUAL multi-leg parlay: 2 to 4 legs combined
+into one bet. Never put a one-leg pick under Parlays. If you don't have
+enough real, independently-supported legs, omit the Parlays section
+entirely rather than forcing one.
+
+Every leg must be an actual bet a sportsbook would let someone place —
+a specific team/player plus a specific outcome (e.g. "Nationals ML",
+"James Wood over 1.5 hits+runs+RBI"). Never include a leg that is really
+just reasoning restated as if it were a bet (e.g. "Braves offense trending
+down supports Nationals" is NOT a leg — that belongs in the "reason"
+field, not the "legs" list).
+
+Avoid legs that are the same bet twice in disguise: never combine a team's
+moneyline with that same team's run line, and never combine a game's run
+line with that same game's total. Everything else is fine to combine,
+including multiple legs on the same team/game outside those two combos
+(e.g. a team's ML plus a prop from that same game is fine).
+
+Parlay legs should lean primarily on moneyline / run line / totals as the
+core — props should be sprinkled in only where there's a genuine standout
+edge, never used to fill out the whole parlay. Never build a parlay made
+entirely of bare "player to record 1+ hit" props; if using a hit-type
+prop as a leg, prefer a real threshold like "over 1.5 hits+runs+RBI" over
+a bare 1+ hit prop.
+
+--- OUTPUT FORMAT ---
 Respond with ONLY valid JSON, no markdown fences, no commentary before or
 after. Use exactly this shape:
 {{
