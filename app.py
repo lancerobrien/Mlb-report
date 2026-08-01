@@ -148,6 +148,16 @@ unless the user explicitly ranked it above other signals. Small BvP samples
 
 Only build these bet types: {wanted_bets}.
 
+For "Hit Picks" specifically: the app will show your 2 highest-scored, so
+try to surface at least 2 real candidates when the data supports it,
+rather than stopping after finding just one strong option — but never
+pad with a weak pick just to hit that count.
+
+For "Parlays": actively look for a real 2-4 leg combination before
+concluding none exists — check across all qualifying games for legs that
+would score 6+ individually before deciding to omit the section. Only
+omit it if you genuinely can't find enough independently-supported legs.
+
 Only build picks from games that clearly haven't started yet — if any data
 looks like it's from an in-progress or finished game (duplicated stat
 lines, empty lineups where one should exist, etc.), skip that game
@@ -211,6 +221,13 @@ any support). Include that as a numeric "score" field. Do not filter or
 sort based on this yourself — just score honestly and include everything
 you'd otherwise have built; the app will handle filtering and ordering
 using your scores.
+
+Never reveal your own deliberation, hedging, or what you considered and
+rejected inside a pick's "pick" or "reason" text — e.g. never write
+something like "X prop not offered, using Y instead." If a bet type isn't
+valid or available, simply don't mention it at all; every pick must read
+as a clean, standalone recommendation with no trace of what you ruled out
+along the way.
 
 Respond with ONLY valid JSON, no markdown fences, no commentary before or
 after. Use exactly this shape:
@@ -294,7 +311,7 @@ def escape_html(s):
             .replace(">", "&gt;").replace('"', "&quot;"))
 
 
-MIN_SCORE_TO_SHOW = 8   # drop anything scoring below this — no "low confidence" picks at all
+MIN_SCORE_TO_SHOW = 6   # drop anything scoring below this — no "low confidence" picks at all
 SECTION_LIMITS = {"Hit Picks": 2}  # cap certain sections to their N highest-scored picks
 
 
