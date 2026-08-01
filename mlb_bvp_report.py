@@ -49,8 +49,13 @@ INCLUDE_ODDS = True             # pull real betting lines (moneyline/run line/to
 ODDS_API_KEY = os.environ.get("ODDS_API_KEY", "")  # set as an env var, never hardcode
 # ----------------------------------------------------------
 
-# ---- Weather source: Open-Meteo (free, no API key, no signup) ----
-WEATHER_BASE = "https://api.open-meteo.com/v1/forecast"
+# ---- Weather source: OpenWeatherMap (free, requires a personal API key) ----
+# Uses the classic 5-day/3-hour forecast endpoint. Free tier: 1,000,000
+# calls/month tied to YOUR key, not a shared IP — avoids the "shared
+# hosting IP hit someone else's daily cap" problem Open-Meteo had on
+# Render's free tier.
+WEATHER_BASE = "https://api.openweathermap.org/data/2.5/forecast"
+OWM_API_KEY = os.environ.get("OWM_API_KEY", "")  # set as an env var, never hardcode
 WEATHER_CACHE_DIR = "/tmp/mlb_weather_cache"
 WEATHER_CACHE_TTL_MINUTES = 90  # forecasts don't change fast; reuse within this window
 
@@ -502,9 +507,10 @@ def classify_wind_vs_park(wind_from_deg, cf_bearing):
 
 
 def get_game_weather(team_abbr, game_date_iso):
-    """Fetch temp/wind/precip at this venue for the exact first-pitch hour.
-    Returns a dict, or a dome/retractable marker, or a dict with an "error"
-    key on failure (so the failure reason is visible instead of silently
+    """Fetch temp/wind/precip at this venue for the hour closest to first
+    pitch, via OpenWeatherMap's 5-day/3-hour forecast endpoint. Returns a
+    dict, or a dome/retractable marker, or a dict with an "error" key on
+    failure (so the failure reason is visible instead of silently
     disappearing)."""
     park = STADIUM.get(team_abbr)
     if not park:
@@ -512,6 +518,8 @@ def get_game_weather(team_abbr, game_date_iso):
     lat, lon, roof = park
     if roof == "dome":
         return {"roof": "dome"}
+    if not OWM_API_KEY:
+        return {"error": "no OWM_API_KEY set — add one in Render under Environment"}
 
     try:
         game_dt = datetime.fromisoformat(game_date_iso.replace("Z", "+00:00"))
@@ -523,36 +531,30 @@ def get_game_weather(team_abbr, game_date_iso):
         r = session.get(
             WEATHER_BASE,
             params={
-                "latitude": lat, "longitude": lon,
-                "hourly": "temperature_2m,wind_speed_10m,wind_direction_10m,"
-                          "precipitation_probability",
-                "temperature_unit": "fahrenheit", "wind_speed_unit": "mph",
-                "timezone": "UTC",
-                "start_date": game_dt.strftime("%Y-%m-%d"),
-                "end_date": game_dt.strftime("%Y-%m-%d"),
+                "lat": lat, "lon": lon,
+                "appid": OWM_API_KEY,
+                "units": "imperial",  # gives temp in F and wind in mph directly
             },
             timeout=30,
         )
         if r.status_code != 200:
-            return {"error": f"Open-Meteo returned HTTP {r.status_code}: {r.text[:200]}"}
-        hourly = r.json().get("hourly", {})
-        times = hourly.get("time", [])
-        if not times:
-            return {"error": "Open-Meteo response had no hourly time data"}
-        # find the hour closest to first pitch
-        target = game_dt.strftime("%Y-%m-%dT%H:00")
-        idx = times.index(target) if target in times else min(
-            range(len(times)),
-            key=lambda i: abs(datetime.fromisoformat(times[i]) - game_dt.replace(tzinfo=None))
+            return {"error": f"OpenWeatherMap returned HTTP {r.status_code}: {r.text[:200]}"}
+        entries = r.json().get("list", [])
+        if not entries:
+            return {"error": "OpenWeatherMap response had no forecast entries"}
+        # find the 3-hour block closest to first pitch
+        best = min(
+            entries,
+            key=lambda e: abs(datetime.fromtimestamp(e["dt"], tz=timezone.utc) - game_dt)
         )
-        wind_dir = hourly["wind_direction_10m"][idx]
+        wind_dir = best.get("wind", {}).get("deg", 0)
         result = {
             "roof": roof,
-            "temp_f": round(hourly["temperature_2m"][idx]),
-            "wind_mph": round(hourly["wind_speed_10m"][idx]),
+            "temp_f": round(best.get("main", {}).get("temp", 0)),
+            "wind_mph": round(best.get("wind", {}).get("speed", 0)),
             "wind_from_deg": wind_dir,
             "wind_from_compass": deg_to_compass(wind_dir),
-            "precip_pct": hourly["precipitation_probability"][idx],
+            "precip_pct": round(best.get("pop", 0) * 100),
         }
         if team_abbr in CF_BEARING:
             result["park_relative"] = classify_wind_vs_park(wind_dir, CF_BEARING[team_abbr])
