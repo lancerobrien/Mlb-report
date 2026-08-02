@@ -13,6 +13,7 @@ Requires an environment variable ANTHROPIC_API_KEY set in Render
 import io
 import os
 import sys
+import re
 import json
 import contextlib
 import importlib
@@ -319,6 +320,49 @@ def score_to_label(score):
     return "high" if score >= 8 else "medium"  # anything shown at all is already 8+ (see MIN_SCORE_TO_SHOW)
 
 
+def _extract_ml_team(leg):
+    """Returns the team name if this leg is a moneyline bet, else None."""
+    m = re.match(r'^(.*?)\s+ML$', leg.strip(), re.IGNORECASE)
+    return m.group(1).strip().lower() if m else None
+
+
+def _extract_runline_team(leg):
+    """Returns the team name if this leg is a run line / spread bet, else
+    None. Deliberately excludes Over/Under legs (those are totals, not
+    team spreads, and are fine to combine with a team's ML)."""
+    stripped = leg.strip()
+    if re.match(r'^(over|under)\b', stripped, re.IGNORECASE):
+        return None
+    m = re.match(r'^(.*?)\s+[+-]\d+(\.\d+)?', stripped)
+    return m.group(1).strip().lower() if m else None
+
+
+def fix_parlay_legs(legs):
+    """Code-enforced backstop for the same-team ML+run-line rule — the
+    prompt asks Claude to avoid this, but it's slipped through before, so
+    this catches and fixes it deterministically rather than trusting the
+    model alone. Keeps the ML leg and drops the redundant run line leg for
+    any team that has both."""
+    if not legs or not isinstance(legs, list):
+        return legs
+    ml_teams = set()
+    rl_indices = {}
+    for i, leg in enumerate(legs):
+        if not isinstance(leg, str):
+            continue
+        ml_team = _extract_ml_team(leg)
+        if ml_team:
+            ml_teams.add(ml_team)
+        rl_team = _extract_runline_team(leg)
+        if rl_team:
+            rl_indices.setdefault(rl_team, []).append(i)
+    drop = set()
+    for team, idxs in rl_indices.items():
+        if team in ml_teams:
+            drop.update(idxs)
+    return [leg for i, leg in enumerate(legs) if i not in drop]
+
+
 def render_picks(parsed):
     sections = parsed.get("sections", [])
     if not sections:
@@ -340,6 +384,12 @@ def render_picks(parsed):
                 score = 0
             if score < MIN_SCORE_TO_SHOW:
                 continue
+            legs = p.get("legs")
+            if legs and isinstance(legs, list):
+                fixed_legs = fix_parlay_legs(legs)
+                if len(fixed_legs) < 2:
+                    continue  # fixing the ML+run-line conflict left too few real legs — drop this pick
+                p = {**p, "legs": fixed_legs}
             scored.append((score, p))
         scored.sort(key=lambda t: t[0], reverse=True)
         limit = SECTION_LIMITS.get(title_raw)
