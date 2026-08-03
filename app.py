@@ -389,7 +389,10 @@ def render_picks(parsed):
                 fixed_legs = fix_parlay_legs(legs)
                 if len(fixed_legs) < 2:
                     continue  # fixing the ML+run-line conflict left too few real legs — drop this pick
-                p = {**p, "legs": fixed_legs}
+                new_title = re.sub(r'^\d+-leg\b', f'{len(fixed_legs)}-leg', p.get("pick", ""), flags=re.IGNORECASE)
+                if not re.match(r'^\d+-leg\b', new_title, re.IGNORECASE):
+                    new_title = f'{len(fixed_legs)}-leg parlay'
+                p = {**p, "legs": fixed_legs, "pick": new_title}
             scored.append((score, p))
         scored.sort(key=lambda t: t[0], reverse=True)
         limit = SECTION_LIMITS.get(title_raw)
