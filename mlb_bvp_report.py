@@ -776,6 +776,10 @@ def main():
     if INCLUDE_ODDS and not ODDS_API_KEY:
         print("(No ODDS_API_KEY set — real betting lines unavailable, "
               "picks will be based on stats only, no point totals/spreads.)\n")
+    elif INCLUDE_ODDS and "__error__" in odds_map:
+        print(f"(Odds fetch failed for the whole slate: {odds_map['__error__']} "
+              "— every game below will show 'no line data available' because of "
+              "this, not because lines genuinely aren't posted yet.)\n")
 
     # Detailed BvP
     for g in games:
