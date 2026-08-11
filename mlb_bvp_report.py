@@ -156,25 +156,53 @@ def filter_upcoming_games(games):
 
     This naturally excludes finished games (which have the corrupted BvP
     data bug — see file header) and in-progress games, and keeps the
-    window to when lineups are actually likely to be posted."""
+    window to when lineups are actually likely to be posted.
+
+    Returns (kept_games, debug_lines) — debug_lines explains why each
+    non-kept game was skipped, in Eastern time, so mismatches are
+    diagnosable directly from the report output instead of guesswork."""
     now = datetime.now(timezone.utc)
     min_start = now + timedelta(minutes=MIN_MINUTES_BEFORE_FIRST_PITCH)
     max_start = now + timedelta(hours=MAX_HOURS_BEFORE_FIRST_PITCH)
+    try:
+        from zoneinfo import ZoneInfo
+        et = ZoneInfo("America/New_York")
+    except Exception:
+        et = None
+
     kept = []
+    debug_lines = []
     for g in games:
+        try:
+            a = g["teams"]["away"]["team"]["name"]
+            h = g["teams"]["home"]["team"]["name"]
+            label = f"{a} @ {h}"
+        except Exception:
+            label = "(unknown matchup)"
+
         state = g.get("status", {}).get("abstractGameState", "")
-        if state != "Preview":
-            continue  # skip Live and Final games
         game_date_str = g.get("gameDate", "")
-        if not game_date_str:
-            continue
         try:
             game_dt = datetime.fromisoformat(game_date_str.replace("Z", "+00:00"))
+            local_str = game_dt.astimezone(et).strftime("%-I:%M %p ET") if et else game_dt.isoformat()
         except Exception:
+            game_dt = None
+            local_str = "unknown time"
+
+        if state != "Preview":
+            debug_lines.append(f"  - {label}: status is '{state}' (not Preview) — already started or finished")
             continue
-        if min_start <= game_dt <= max_start:
-            kept.append(g)
-    return kept
+        if game_dt is None:
+            debug_lines.append(f"  - {label}: no valid game time in schedule data")
+            continue
+        if game_dt < min_start:
+            debug_lines.append(f"  - {label}: starts {local_str} — under the {MIN_MINUTES_BEFORE_FIRST_PITCH}-min minimum")
+            continue
+        if game_dt > max_start:
+            debug_lines.append(f"  - {label}: starts {local_str} — more than {MAX_HOURS_BEFORE_FIRST_PITCH}h away")
+            continue
+        kept.append(g)
+    return kept, debug_lines
 
 
 ODDS_BASE = "https://api.the-odds-api.com/v4/sports/baseball_mlb/odds"
@@ -717,12 +745,16 @@ def main():
 
     if FILTER_TO_UPCOMING_WINDOW:
         all_count = len(games)
-        games = filter_upcoming_games(games)
+        games, debug_lines = filter_upcoming_games(games)
         skipped = all_count - len(games)
         print(f"Showing games starting in the next {MAX_HOURS_BEFORE_FIRST_PITCH}h "
               f"(at least {MIN_MINUTES_BEFORE_FIRST_PITCH} min out) — "
               f"{len(games)} of {all_count} today's games qualify"
-              f"{f' ({skipped} skipped: already started, finished, or too far out)' if skipped else ''}.\n")
+              f"{f' ({skipped} skipped)' if skipped else ''}.")
+        if debug_lines:
+            print("Skip reasons:")
+            print("\n".join(debug_lines))
+        print()
         if not games:
             print("No games are currently in the pre-first-pitch window. "
                   "Try again closer to first pitch times.")
